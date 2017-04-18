@@ -5,6 +5,15 @@ $(function() {
         // Track the sex (male, female) and drinking type (any, binge) in variables
         var sex = 'female';
         var type = 'binge';
+        $('input').on('change', function() {
+            var clicked = $(this)[0].value;
+            if (clicked == 'male' || clicked == 'female')
+                sex = clicked;
+            else
+                type = clicked;
+            var currentData = filterData();
+            draw(currentData);
+        });
 
         // Filter data down
         var data = allData.filter(function(d) {
@@ -79,6 +88,63 @@ $(function() {
         // Define a yScale with d3.scaleLinear. Domain/rage will be set in the setScales function.
         var yScale = d3.scaleLinear();
 
+        // Write a function for setting scales.
+        var setScales = function(data) {
+            // Get the unique values of states for the domain of your x scale
+            var states = data.map(function(d) {
+                return d.state;
+            });
+
+            // Set the domain/range of your xScale
+            xScale.range([0, drawWidth])
+                .padding(0.1)
+                .domain(states);
+
+            // Get min/max values of the percent data (for your yScale domain)
+            var yMin = d3.min(data, function(d) {
+                return +d.percent;
+            });
+
+            var yMax = d3.max(data, function(d) {
+                return +d.percent;
+            });
+
+            // Set the domain/range of your yScale
+            yScale.range([drawHeight, 0])
+                .domain([0, yMax]);
+        };
+
+        var setAxes = function() {
+            // Set the scale of your xAxis object
+            xAxis.scale(xScale);
+
+            // Set the scale of your yAxis object
+            yAxis.scale(yScale);
+
+            // Render (call) your xAxis in your xAxisLabel
+            xAxisLabel.transition().duration(500).call(xAxis);
+
+            // Render (call) your yAxis in your yAxisLabel
+            yAxisLabel.transition().duration(500).call(yAxis);
+
+            // Update xAxisText and yAxisText labels
+            xAxisText.text('State');
+            yAxisText.text('Percent Drinking (' + sex + ', ' + type + ')');
+        }
+
+        var filterData = function() {
+            var currentData = allData.filter(function(d) {
+                    return d.type == type && d.sex == sex
+                })
+                // Sort the data alphabetically
+                // Hint: http://stackoverflow.com/questions/6712034/sort-array-by-firstname-alphabetically-in-javascript
+                .sort(function(a, b) {
+                    if (a.state_name < b.state_name) return -1;
+                    if (a.state_name > b.state_name) return 1;
+                    return 0;
+                });
+            return currentData;
+        };
 
         // Get the unique values of states for the domain of your x scale
         var states = data.map(function(d) {
@@ -132,6 +198,7 @@ $(function() {
 
         // Use the .enter() method to get your entering elements, and assign initial positions
         bars.enter().append('rect')
+            .merge(bars)
             .attr('x', function(d) {
                 return xScale(d.state);
             })
@@ -145,5 +212,46 @@ $(function() {
             .attr('height', function(d) {
                 return drawHeight - yScale(d.percent);
             });
+        bars.exit().remove();
+
+        var draw = function(data) {
+            // Set scales
+            setScales(data);
+
+            // Set axes
+            setAxes();
+
+            // Select all rects and bind data
+            var bars = g.selectAll('rect').data(data);
+
+            // Use the .enter() method to get your entering elements, and assign initial positions
+            bars.enter().append('rect')
+                .attr('x', function(d) {
+                    return xScale(d.state);
+                })
+                .attr('y', function(d) {
+                    return drawHeight;
+                })
+                .attr('height', 0)
+                .attr('class', 'bar')
+                .on('mouseover', tip.show)
+                .on('mouseout', tip.hide)
+                .attr('width', xScale.bandwidth())
+                .merge(bars)
+                .transition()
+                .duration(300)
+                .delay(function(d, i) {
+                    return i * 10;
+                })
+                .attr('y', function(d) {
+                    return yScale(d.percent);
+                })
+                .attr('height', function(d) {
+                    return drawHeight - yScale(d.percent);
+                });
+
+            // Use the .exit() and .remove() methods to remove elements that are no longer in the data
+            bars.exit().remove();
+        };
     });
 });
